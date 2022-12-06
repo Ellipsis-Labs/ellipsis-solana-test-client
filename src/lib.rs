@@ -1289,20 +1289,25 @@ impl ProgramTestContext {
     pub fn get_transaction_details(
         &self,
         transaction: &Transaction, // Executed transaction
-        tx_index: usize,           // Index of top level instruction in transaction
     ) -> Vec<ExecutedInstruction> {
         let mut map = TRANSACTION_DETAILS.lock().unwrap();
-        let hash = get_hash_from_transaction(transaction, tx_index);
-        // Panics if the hash is not found. This will happen on the off-chance that the transaction's blockhash
-        // expires before the transaction details are queried.
-        let index = *map.hash_candidates.get(&hash).unwrap();
-        let res = map.executed_instructions[index].clone();
-        // Clean up the state
-        map.executed_instructions[index].drain(..);
-        for key in map.index_to_hash[index].clone().iter() {
-            map.hash_candidates.remove(key);
-        }
-        map.index_to_hash[index].clear();
+        let res = (0..transaction.message.instructions.len())
+            .filter_map(|tx_index| {
+                let hash = get_hash_from_transaction(transaction, tx_index);
+                // Panics if the hash is not found. This will happen on the off-chance that the transaction's blockhash
+                // expires before the transaction details are queried.
+                let index = *map.hash_candidates.get(&hash)?;
+                let res = map.executed_instructions[index].clone();
+                // Clean up the state
+                map.executed_instructions[index].drain(..);
+                for key in map.index_to_hash[index].clone().iter() {
+                    map.hash_candidates.remove(key);
+                }
+                map.index_to_hash[index].clear();
+                Some(res)
+            })
+            .flat_map(|ixs| ixs)
+            .collect();
         res
     }
 }

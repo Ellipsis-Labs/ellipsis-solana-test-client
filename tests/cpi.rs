@@ -150,7 +150,7 @@ async fn cpi() {
         .await
         .unwrap();
 
-    let execution_stack = context.get_transaction_details(&transaction, 0);
+    let execution_stack = context.get_transaction_details(&transaction);
     assert_eq!(execution_stack[0].stack_depth, 1);
     assert_eq!(execution_stack[0].program_id, invoker_program_id);
     assert_eq!(execution_stack[1].stack_depth, 2);
@@ -196,7 +196,7 @@ async fn cpi_dupes() {
         .process_transaction(transaction.clone())
         .await
         .unwrap();
-    let execution_stack = context.get_transaction_details(&transaction, 0);
+    let execution_stack = context.get_transaction_details(&transaction);
     assert_eq!(execution_stack[0].stack_depth, 1);
     assert_eq!(execution_stack[0].program_id, invoker_program_id);
     assert_eq!(execution_stack[1].stack_depth, 2);
@@ -236,7 +236,7 @@ async fn cpi_create_account() {
         .process_transaction(transaction.clone())
         .await
         .unwrap();
-    let execution_stack = context.get_transaction_details(&transaction, 0);
+    let execution_stack = context.get_transaction_details(&transaction);
     assert_eq!(execution_stack[0].stack_depth, 1);
     assert_eq!(execution_stack[0].program_id, create_account_program_id);
     assert_eq!(execution_stack[1].stack_depth, 2);
@@ -285,16 +285,13 @@ async fn cpi_multiple_top_level_insturctions() {
         .await
         .unwrap();
 
-    let execution_stack = context.get_transaction_details(&transaction, 0);
-    assert_eq!(execution_stack.len(), 2);
+    let execution_stack = context.get_transaction_details(&transaction);
+    assert_eq!(execution_stack.len(), 3);
     assert_eq!(execution_stack[0].stack_depth, 1);
     assert_eq!(execution_stack[0].program_id, invoker_program_id);
     assert_eq!(execution_stack[1].stack_depth, 2);
     assert_eq!(execution_stack[1].program_id, invoked_program_id);
-
-    let execution_stack = context.get_transaction_details(&transaction, 1);
-    assert_eq!(execution_stack.len(), 1);
-    assert_eq!(execution_stack[0].stack_depth, 1);
-    assert_eq!(execution_stack[0].program_id, invoked_program_id);
-    assert_eq!(execution_stack[0].data, "hello world".as_bytes());
+    assert_eq!(execution_stack[2].stack_depth, 1);
+    assert_eq!(execution_stack[2].program_id, invoked_program_id);
+    assert_eq!(execution_stack[2].data, "hello world".as_bytes());
 }
