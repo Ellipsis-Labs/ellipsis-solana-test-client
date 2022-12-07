@@ -11,8 +11,6 @@ use {
     async_trait::async_trait,
     chrono_humanize::{Accuracy, HumanTime, Tense},
     log::*,
-    solana_banks_client::start_client,
-    solana_banks_server::banks_server::start_local_server,
     solana_bpf_loader_program::serialization::serialize_parameters,
     solana_program_runtime::{
         compute_budget::ComputeBudget, ic_msg, invoke_context::ProcessInstructionWithContext,
@@ -62,12 +60,15 @@ use {
     tokio::task::JoinHandle,
 };
 // Export types so test clients can limit their solana crate dependencies
-pub use {
-    solana_banks_client::{BanksClient, BanksClientError},
-    solana_program_runtime::invoke_context::InvokeContext,
-};
+pub use solana_program_runtime::invoke_context::InvokeContext;
 
+pub mod banks_client;
+pub mod banks_client_interface;
+pub mod banks_server;
 pub mod programs;
+use banks_client::{start_client, BanksClient};
+
+use banks_server::start_local_server;
 
 #[macro_use]
 extern crate solana_bpf_loader_program;
@@ -130,13 +131,8 @@ pub fn get_hash_from_transaction(transaction: &Transaction, index: usize) -> Str
 
 pub fn get_all_hashes_from_invoke_context(invoke_context: &InvokeContext) -> Vec<String> {
     let tx_context = &invoke_context.transaction_context;
-    // We first grab the relevant instruction from the invoke context
-    // This should be the closest top level instruction
-    let invoke_stack_len = tx_context.get_instruction_trace().last().unwrap().len();
-    let stack_height = invoke_context.get_stack_height();
-    let starting_context = tx_context
-        .get_instruction_context_at(invoke_stack_len - stack_height)
-        .unwrap();
+
+    let starting_context = tx_context.get_instruction_context_at(0).unwrap();
     let num_accounts = tx_context.get_number_of_accounts() as usize;
     // Then we generate a hash of all the account keys (deduped, sorted) in the transaction
     let account_key_hash = hashv(
@@ -337,6 +333,17 @@ impl solana_sdk::program_stubs::SyscallStubs for SyscallStubs {
     fn sol_log(&self, message: &str) {
         let invoke_context = get_invoke_context();
         ic_msg!(invoke_context, "Program log: {}", message);
+    }
+
+    fn sol_log_compute_units(&self) {
+        let invoke_context = get_invoke_context();
+        let compute_meter = invoke_context.get_compute_meter();
+        let compute_units = compute_meter.borrow().get_remaining();
+        ic_msg!(
+            invoke_context,
+            "Program consumed {} compute units",
+            compute_units
+        );
     }
 
     fn sol_invoke_signed(
@@ -1284,6 +1291,16 @@ impl ProgramTestContext {
         let bank = bank_forks.working_bank();
         self.last_blockhash = bank.last_blockhash();
         Ok(())
+    }
+
+    /// Get a new latest blockhash, similar in spirit to RpcClient::get_latest_blockhash()
+    pub async fn get_new_latest_blockhash(&mut self) -> io::Result<Hash> {
+        let blockhash = self
+            .banks_client
+            .get_new_latest_blockhash(&self.last_blockhash)
+            .await?;
+        self.last_blockhash = blockhash;
+        Ok(blockhash)
     }
 
     pub fn get_transaction_details(

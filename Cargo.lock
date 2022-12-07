@@ -3034,54 +3034,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "solana-banks-client"
-version = "1.14.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a03d21338c579b621b26cb3c8ef05a417d3852891cef46312cb4df00574b8371"
-dependencies = [
- "borsh",
- "futures",
- "solana-banks-interface",
- "solana-program",
- "solana-sdk",
- "tarpc",
- "thiserror",
- "tokio",
- "tokio-serde",
-]
-
-[[package]]
-name = "solana-banks-interface"
-version = "1.14.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1b83bf0d8b1cac6f7f82d872f660e5b1a54c1c8698d4706972237391fc7eff2"
-dependencies = [
- "serde",
- "solana-sdk",
- "tarpc",
-]
-
-[[package]]
-name = "solana-banks-server"
-version = "1.14.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c6d523f852b125d700e797d6a9517adf36c867369311fef1cf6b343e2fa797e"
-dependencies = [
- "bincode",
- "crossbeam-channel",
- "futures",
- "solana-banks-interface",
- "solana-client",
- "solana-runtime",
- "solana-sdk",
- "solana-send-transaction-service",
- "tarpc",
- "tokio",
- "tokio-serde",
- "tokio-stream",
-]
-
-[[package]]
 name = "solana-bpf-loader-program"
 version = "1.14.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3465,23 +3417,26 @@ dependencies = [
  "async-trait",
  "base64 0.13.1",
  "bincode",
+ "borsh",
  "chrono-humanize",
  "crossbeam-channel",
+ "futures",
  "itertools",
  "lazy_static",
  "log",
  "serde",
- "solana-banks-client",
- "solana-banks-interface",
- "solana-banks-server",
  "solana-bpf-loader-program",
+ "solana-client",
  "solana-logger",
  "solana-program-runtime",
  "solana-runtime",
  "solana-sdk",
+ "solana-send-transaction-service",
  "solana-vote-program",
+ "tarpc",
  "thiserror",
  "tokio",
+ "tokio-serde",
 ]
 
 [[package]]

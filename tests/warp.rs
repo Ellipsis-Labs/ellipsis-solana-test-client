@@ -1,7 +1,7 @@
 #![allow(clippy::integer_arithmetic)]
 use {
     bincode::deserialize,
-    solana_banks_client::BanksClient,
+    solana_program_test::banks_client::BanksClient,
     solana_program_test::{
         processor, ProgramTest, ProgramTestBanksClientExt, ProgramTestContext, ProgramTestError,
     },
