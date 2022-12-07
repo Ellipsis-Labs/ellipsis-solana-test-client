@@ -3410,36 +3410,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "solana-program-test"
-version = "1.15.0"
-dependencies = [
- "assert_matches",
- "async-trait",
- "base64 0.13.1",
- "bincode",
- "borsh",
- "chrono-humanize",
- "crossbeam-channel",
- "futures",
- "itertools",
- "lazy_static",
- "log",
- "serde",
- "solana-bpf-loader-program",
- "solana-client",
- "solana-logger",
- "solana-program-runtime",
- "solana-runtime",
- "solana-sdk",
- "solana-send-transaction-service",
- "solana-vote-program",
- "tarpc",
- "thiserror",
- "tokio",
- "tokio-serde",
-]
-
-[[package]]
 name = "solana-rayon-threadlimit"
 version = "1.14.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3657,6 +3627,36 @@ dependencies = [
  "thiserror",
  "tokio",
  "x509-parser",
+]
+
+[[package]]
+name = "solana-test-client"
+version = "1.15.0"
+dependencies = [
+ "assert_matches",
+ "async-trait",
+ "base64 0.13.1",
+ "bincode",
+ "borsh",
+ "chrono-humanize",
+ "crossbeam-channel",
+ "futures",
+ "itertools",
+ "lazy_static",
+ "log",
+ "serde",
+ "solana-bpf-loader-program",
+ "solana-client",
+ "solana-logger",
+ "solana-program-runtime",
+ "solana-runtime",
+ "solana-sdk",
+ "solana-send-transaction-service",
+ "solana-vote-program",
+ "tarpc",
+ "thiserror",
+ "tokio",
+ "tokio-serde",
 ]
 
 [[package]]

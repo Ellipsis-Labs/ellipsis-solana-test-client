@@ -1,7 +1,5 @@
 use {
     assert_matches::assert_matches,
-    solana_program_test::banks_client::BanksClientError,
-    solana_program_test::{processor, ProgramTest},
     solana_sdk::{
         account_info::{next_account_info, AccountInfo},
         commitment_config::CommitmentLevel,
@@ -15,6 +13,8 @@ use {
         transaction::Transaction,
         transaction_context::TransactionReturnData,
     },
+    solana_test_client::processor,
+    solana_test_client::program_test::ProgramTest,
     std::str::from_utf8,
 };
 
@@ -133,7 +133,7 @@ async fn simulation_return_data() {
         .unwrap_err();
     assert_matches!(
         error,
-        BanksClientError::SimulationError {
+        solana_test_client::banks_client::BanksClientError::SimulationError {
             return_data: Some(TransactionReturnData {
                 program_id,
                 data,

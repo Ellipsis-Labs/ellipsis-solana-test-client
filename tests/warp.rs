@@ -1,10 +1,6 @@
 #![allow(clippy::integer_arithmetic)]
 use {
     bincode::deserialize,
-    solana_program_test::banks_client::BanksClient,
-    solana_program_test::{
-        processor, ProgramTest, ProgramTestBanksClientExt, ProgramTestContext, ProgramTestError,
-    },
     solana_sdk::{
         account_info::{next_account_info, AccountInfo},
         clock::Clock,
@@ -25,6 +21,10 @@ use {
             Sysvar,
         },
         transaction::{Transaction, TransactionError},
+    },
+    solana_test_client::banks_client::BanksClient,
+    solana_test_client::{
+        processor, ProgramTest, ProgramTestBanksClientExt, ProgramTestContext, ProgramTestError,
     },
     solana_vote_program::{
         vote_instruction,

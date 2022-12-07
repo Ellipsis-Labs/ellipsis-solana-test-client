@@ -1,9 +1,8 @@
 [package]
-authors = ["Solana Maintainers <maintainers@solana.foundation>"]
-description = "Solana Program Test Framework"
+description = "Solana Test Client Framework"
 edition = "2021"
 license = "Apache-2.0"
-name = "solana-program-test"
+name = "solana-test-client"
 repository = "https://github.com/solana-labs/solana"
 version = "1.15.0"
 
