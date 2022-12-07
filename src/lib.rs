@@ -1,10 +1,6 @@
 //! The solana-program-test provides a BanksClient-based test framework BPF programs
 #![allow(clippy::integer_arithmetic)]
 
-use std::{collections::BTreeMap, sync::Mutex};
-
-use itertools::Itertools;
-use solana_sdk::{keccak::hashv, transaction::Transaction};
 // Export tokio for test clients
 pub use tokio;
 use {
@@ -73,95 +69,6 @@ use banks_server::start_local_server;
 #[macro_use]
 extern crate solana_bpf_loader_program;
 
-#[macro_use]
-extern crate lazy_static;
-
-#[derive(Debug, Clone)]
-pub struct ExecutedInstruction {
-    pub stack_depth: usize,
-    pub program_id: Pubkey,
-    pub accounts: Vec<Pubkey>,
-    pub data: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct TransactionDetails {
-    pub hash_candidates: BTreeMap<String, usize>,
-    pub executed_instructions: Vec<Vec<ExecutedInstruction>>,
-    pub index_to_hash: Vec<Vec<String>>,
-}
-
-impl TransactionDetails {
-    pub fn new() -> Self {
-        Self {
-            hash_candidates: BTreeMap::new(),
-            executed_instructions: vec![],
-            index_to_hash: vec![],
-        }
-    }
-}
-
-lazy_static! {
-    static ref TRANSACTION_DETAILS: Mutex<TransactionDetails> =
-        Mutex::new(TransactionDetails::new());
-}
-
-pub fn get_hash_from_transaction(transaction: &Transaction, index: usize) -> String {
-    // First, we generate a hash of all the account keys (deduped, sorted) in the transaction
-    let account_key_hash = hashv(
-        transaction
-            .message
-            .account_keys
-            .iter()
-            .map(|k| *k)
-            .sorted()
-            .unique_by(|k| *k)
-            .map(|k| k.to_bytes())
-            .collect::<Vec<[u8; 32]>>()
-            .iter()
-            .map(|k| k.as_slice())
-            .collect::<Vec<&[u8]>>()
-            .as_slice(),
-    );
-    let data = transaction.message.instructions[index].data.clone();
-    let blockhash = transaction.message.recent_blockhash;
-    let res = hashv(&[&data, account_key_hash.as_ref(), blockhash.as_ref()]).to_string();
-    res
-}
-
-pub fn get_all_hashes_from_invoke_context(invoke_context: &InvokeContext) -> Vec<String> {
-    let tx_context = &invoke_context.transaction_context;
-
-    let starting_context = tx_context.get_instruction_context_at(0).unwrap();
-    let num_accounts = tx_context.get_number_of_accounts() as usize;
-    // Then we generate a hash of all the account keys (deduped, sorted) in the transaction
-    let account_key_hash = hashv(
-        (0..num_accounts)
-            .map(|i| *tx_context.get_key_of_account_at_index(i).unwrap())
-            .sorted()
-            .unique_by(|k| *k)
-            .map(|k| k.to_bytes())
-            .collect::<Vec<[u8; 32]>>()
-            .iter()
-            .map(|k| k.as_slice())
-            .collect::<Vec<&[u8]>>()
-            .as_slice(),
-    );
-    let data = starting_context.get_instruction_data().to_vec();
-    // We then compute all of the candidate hashes for the current transaction
-    #[allow(deprecated)]
-    let hashes = invoke_context
-        .sysvar_cache
-        .get_recent_blockhashes()
-        .unwrap()
-        .iter()
-        .map(|entry| {
-            hashv(&[&data, account_key_hash.as_ref(), entry.blockhash.as_ref()]).to_string()
-        })
-        .collect::<Vec<String>>();
-    hashes
-}
-
 /// Errors from the program test environment
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ProgramTestError {
@@ -220,27 +127,6 @@ pub fn builtin_process_instruction(
     // Deserialize data back into instruction params
     let (program_id, account_infos, _input) =
         unsafe { deserialize(&mut parameter_bytes.as_slice_mut()[0] as *mut u8) };
-
-    if invoke_context.get_stack_height() == 1 {
-        let mut map = TRANSACTION_DETAILS.lock().unwrap();
-        // This should always be a new entry because the stack height is 1
-        let index = map.executed_instructions.len();
-        map.executed_instructions.push(vec![]);
-        // Add the first executed instruction
-        map.executed_instructions[index].push(ExecutedInstruction {
-            stack_depth: invoke_context.get_stack_height(),
-            program_id: *program_id,
-            accounts: account_infos.iter().map(|a| *a.key).collect(),
-            data: instruction_data.to_vec(),
-        });
-        let hashes = get_all_hashes_from_invoke_context(invoke_context);
-        // Create a one-to-many mapping from the index of the executed instruction to all hashes
-        map.index_to_hash.push(hashes.clone());
-        // Create a many-to-one mapping from all hashes to the index of the executed instruction
-        for hash in hashes {
-            map.hash_candidates.insert(hash, index);
-        }
-    }
 
     // Execute the program
     process_instruction(program_id, &account_infos, instruction_data).map_err(|err| {
@@ -436,22 +322,6 @@ impl solana_sdk::program_stubs::SyscallStubs for SyscallStubs {
             if instruction_account.is_writable {
                 account_indices.push((instruction_account.index_in_caller, account_info_index));
             }
-        }
-
-        // Create a new scope so the lock is dropped before the call to process_instruction (RAII)
-        {
-            // Look up the index of the executed instruction list by using the least recent hash
-            let hashes = get_all_hashes_from_invoke_context(invoke_context);
-            let hash = hashes.iter().next().unwrap();
-            let mut map = TRANSACTION_DETAILS.lock().unwrap();
-            let index = *map.hash_candidates.get_mut(hash).unwrap();
-            // Update the list of executed instructions
-            map.executed_instructions[index].push(ExecutedInstruction {
-                stack_depth: invoke_context.get_stack_height() + 1,
-                program_id: instruction.program_id,
-                accounts: account_infos.iter().map(|a| *a.key).collect(),
-                data: instruction.data.to_vec(),
-            });
         }
 
         let mut compute_units_consumed = 0;
@@ -1301,30 +1171,5 @@ impl ProgramTestContext {
             .await?;
         self.last_blockhash = blockhash;
         Ok(blockhash)
-    }
-
-    pub fn get_transaction_details(
-        &self,
-        transaction: &Transaction, // Executed transaction
-    ) -> Vec<ExecutedInstruction> {
-        let mut map = TRANSACTION_DETAILS.lock().unwrap();
-        let res = (0..transaction.message.instructions.len())
-            .filter_map(|tx_index| {
-                let hash = get_hash_from_transaction(transaction, tx_index);
-                // Panics if the hash is not found. This will happen on the off-chance that the transaction's blockhash
-                // expires before the transaction details are queried.
-                let index = *map.hash_candidates.get(&hash)?;
-                let res = map.executed_instructions[index].clone();
-                // Clean up the state
-                map.executed_instructions[index].drain(..);
-                for key in map.index_to_hash[index].clone().iter() {
-                    map.hash_candidates.remove(key);
-                }
-                map.index_to_hash[index].clear();
-                Some(res)
-            })
-            .flat_map(|ixs| ixs)
-            .collect();
-        res
     }
 }
