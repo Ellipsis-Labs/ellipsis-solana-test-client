@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use solana_program_runtime::timings::ExecuteTimings;
-use solana_runtime::bank::TransactionExecutionResult;
+use solana_runtime::bank::{TransactionExecutionDetails, TransactionExecutionResult};
 use solana_sdk::{clock::MAX_PROCESSING_AGE, transaction::VersionedTransaction};
 
 use crate::banks_client_interface::{ParsedInnerInstruction, ParsedInstruction, ParsedTransaction};
@@ -55,6 +55,65 @@ use {
     tokio_serde::formats::Bincode,
 };
 
+fn get_parsed_transaction(
+    details: TransactionExecutionDetails,
+    tx: VersionedTransaction,
+) -> ParsedTransaction {
+    let accounts = tx
+        .message
+        .static_account_keys()
+        .iter()
+        .map(|pk| pk.to_string())
+        .collect::<Vec<_>>();
+    let instructions = tx
+        .message
+        .instructions()
+        .iter()
+        .map(|ix| ParsedInstruction {
+            program_id: accounts[ix.program_id_index as usize].clone(),
+            accounts: ix
+                .accounts
+                .iter()
+                .map(|i| accounts[*i as usize].clone())
+                .collect(),
+            data: ix.data.clone(),
+        })
+        .collect::<Vec<_>>();
+    let inner_instructions = details
+        .inner_instructions
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, ixs)| {
+            if ixs.len() == 0 {
+                None
+            } else {
+                Some(
+                    ixs.iter()
+                        .map(|ix| ParsedInnerInstruction {
+                            parent_index: i,
+                            instruction: ParsedInstruction {
+                                program_id: accounts[ix.program_id_index as usize].clone(),
+                                accounts: ix
+                                    .accounts
+                                    .iter()
+                                    .map(|i| accounts[*i as usize].clone())
+                                    .collect(),
+                                data: ix.data.clone(),
+                            },
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            }
+        })
+        .collect::<Vec<_>>();
+    ParsedTransaction {
+        instructions: instructions.clone(),
+        inner_instructions,
+        logs: details.log_messages.unwrap_or_default(),
+    }
+}
+
 #[derive(Clone)]
 struct BanksServer {
     bank_forks: Arc<RwLock<BankForks>>,
@@ -102,27 +161,7 @@ impl BanksServer {
                 .map(|info| deserialize(&info.wire_transaction).unwrap())
                 .collect();
 
-            let accounts = transactions[0]
-                .message
-                .static_account_keys()
-                .iter()
-                .map(|pk| pk.to_string())
-                .collect::<Vec<_>>();
-
-            let instructions = transactions[0]
-                .message
-                .instructions()
-                .iter()
-                .map(|ix| ParsedInstruction {
-                    program_id: accounts[ix.program_id_index as usize].clone(),
-                    accounts: ix
-                        .accounts
-                        .iter()
-                        .map(|i| accounts[*i as usize].clone())
-                        .collect(),
-                    data: ix.data.clone(),
-                })
-                .collect::<Vec<_>>();
+            let transactions_to_check = transactions.clone();
 
             let batch = match bank.prepare_entry_batch(transactions) {
                 Ok(batch) => batch,
@@ -141,39 +180,12 @@ impl BanksServer {
                 )
                 .0
                 .execution_results;
-            for result in execution_results {
+            for (result, tx) in execution_results.into_iter().zip(transactions_to_check) {
                 if let TransactionExecutionResult::Executed { details, .. } = result {
-                    let inner_instructions = details
-                        .inner_instructions
-                        .unwrap_or_default()
-                        .iter()
-                        .enumerate()
-                        .map(|(i, ixs)| {
-                            ixs.iter()
-                                .map(|ix| ParsedInnerInstruction {
-                                    parent_index: i,
-                                    instruction: ParsedInstruction {
-                                        program_id: accounts[ix.program_id_index as usize].clone(),
-                                        accounts: ix
-                                            .accounts
-                                            .iter()
-                                            .map(|i| accounts[*i as usize].clone())
-                                            .collect(),
-                                        data: ix.data.clone(),
-                                    },
-                                })
-                                .collect::<Vec<_>>()
-                        })
-                        .collect::<Vec<_>>();
-                    let parsed_transaction = ParsedTransaction {
-                        instructions: instructions.clone(),
-                        inner_instructions,
-                        logs: details.log_messages.unwrap_or(vec![]),
-                    };
                     transaction_map
                         .write()
                         .unwrap()
-                        .insert(signature, parsed_transaction);
+                        .insert(signature, get_parsed_transaction(details, tx));
                 }
             }
         }
