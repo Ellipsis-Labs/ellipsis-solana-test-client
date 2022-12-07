@@ -3,8 +3,8 @@ description = "Solana Test Client Framework"
 edition = "2021"
 license = "Apache-2.0"
 name = "solana-test-client"
-repository = "https://github.com/solana-labs/solana"
-version = "1.15.0"
+repository = "https://github.com/Ellipsis-Labs/ellipsis-solana-test-client"
+version = "0.1.0"
 
 [dependencies]
 assert_matches = "1.5.0"
