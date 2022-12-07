@@ -141,7 +141,6 @@ impl BanksServer {
                 )
                 .0
                 .execution_results;
-            println!("{}: {:?}", signature, execution_results);
             for result in execution_results {
                 if let TransactionExecutionResult::Executed { details, .. } = result {
                     let inner_instructions = details
